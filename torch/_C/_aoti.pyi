@@ -35,6 +35,14 @@ class AOTIModelContainerRunner(Protocol):
     def swap_constant_buffer(self) -> None: ...
     def free_inactive_constant_buffer(self) -> None: ...
 
+def create_aoti_model_runner(
+    model_so_path: str,
+    num_models: int,
+    device_str: str,
+    bin_dir: str = ...,
+    run_single_threaded: bool = ...,
+) -> AOTIModelContainerRunner: ...
+
 class AOTIModelContainerRunnerCpu:
     def __init__(self, model_so_path: str, num_models: int) -> None: ...
     def run(

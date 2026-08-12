@@ -24,7 +24,8 @@ std::unique_ptr<AOTIModelContainerRunner> create_aoti_runner_mps(
     const std::string& cubin_dir,
     const bool run_single_threaded) {
   TORCH_CHECK(
-      device_str == "mps", "Incorrect device passed to aoti_runner_mps");
+      device_str == "mps" || device_str.rfind("mps:", 0) == 0,
+      "Incorrect device passed to aoti_runner_mps");
   return std::make_unique<AOTIModelContainerRunnerMps>(
       model_so_path, num_models, run_single_threaded);
 }

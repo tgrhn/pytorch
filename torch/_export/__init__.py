@@ -166,16 +166,11 @@ def aot_load(so_path: str, device: str) -> Callable:
     """
     aot_compile_warning()
 
-    if device == "cpu":
-        runner: AOTIModelContainerRunner = torch._C._aoti.AOTIModelContainerRunnerCpu(so_path, 1)
-    elif device == "cuda" or device.startswith("cuda:"):
-        runner = torch._C._aoti.AOTIModelContainerRunnerCuda(so_path, 1, device)
-    elif device == "xpu" or device.startswith("xpu:"):
-        runner = torch._C._aoti.AOTIModelContainerRunnerXpu(so_path, 1, device)
-    elif device == "mps" or device.startswith("mps:"):
-        runner = torch._C._aoti.AOTIModelContainerRunnerMps(so_path, 1)
-    else:
-        raise RuntimeError("Unsupported device " + device)
+    # create_aoti_model_runner dispatches via the C++ AOTI model runner
+    # registry (getAOTIModelRunnerRegistry), so any backend that self-registers
+    # a runner factory -- including out-of-tree PrivateUse1 backends -- works
+    # here without needing a new branch.
+    runner: AOTIModelContainerRunner = torch._C._aoti.create_aoti_model_runner(so_path, 1, device)
 
     def optimized(*args, **kwargs):
         call_spec = runner.get_call_spec()

@@ -20,6 +20,85 @@ void initAOTIRunnerBindings(PyObject* module) {
   auto rootModule = py::handle(module).cast<py::module>();
   auto m = rootModule.def_submodule("_aoti");
 
+  // Device-agnostic base class binding. Backends (including out-of-tree
+  // PrivateUse1 backends) register their runner factory via
+  // RegisterAOTIModelRunner; create_aoti_model_runner() below looks up the
+  // factory by device key so callers never need to hardcode a device list.
+  py::class_<AOTIModelContainerRunner>(m, "AOTIModelContainerRunner")
+      .def(
+          "run",
+          &AOTIModelContainerRunner::run,
+          py::arg("inputs"),
+          py::arg("stream_handle") = nullptr)
+      .def("get_call_spec", &AOTIModelContainerRunner::get_call_spec)
+      .def(
+          "get_constant_names_to_original_fqns",
+          &AOTIModelContainerRunner::getConstantNamesToOriginalFQNs)
+      .def(
+          "get_constant_names_to_dtypes",
+          &AOTIModelContainerRunner::getConstantNamesToDtypes)
+      .def(
+          "extract_constants_map",
+          &AOTIModelContainerRunner::extract_constants_map)
+      .def(
+          "update_constant_buffer",
+          static_cast<void (AOTIModelContainerRunner::*)(
+              std::unordered_map<std::string, at::Tensor>&, bool, bool, bool)>(
+              &AOTIModelContainerRunner::update_constant_buffer),
+          py::arg("tensor_map"),
+          py::arg("use_inactive"),
+          py::arg("validate_full_updates"),
+          py::arg("user_managed") = false)
+      .def(
+          "update_constant_buffer_from_cpu",
+          static_cast<void (AOTIModelContainerRunner::*)(
+              std::unordered_map<std::string, at::Tensor>&, bool, bool)>(
+              &AOTIModelContainerRunner::update_constant_buffer_from_cpu),
+          py::arg("tensor_map"),
+          py::arg("use_inactive"),
+          py::arg("validate_full_updates"))
+      .def(
+          "swap_constant_buffer",
+          &AOTIModelContainerRunner::swap_constant_buffer)
+      .def(
+          "free_inactive_constant_buffer",
+          &AOTIModelContainerRunner::free_inactive_constant_buffer)
+      .def(
+          "did_call_load_constants",
+          &AOTIModelContainerRunner::did_call_load_constants)
+      .def(
+          "update_constant_buffer_from_blob",
+          &AOTIModelContainerRunner::update_constant_buffer_from_blob,
+          py::arg("weights_path"));
+
+  m.def(
+      "create_aoti_model_runner",
+      [](const std::string& model_so_path,
+         size_t num_models,
+         const std::string& device_str,
+         const std::string& bin_dir,
+         const bool run_single_threaded)
+          -> std::unique_ptr<AOTIModelContainerRunner> {
+        auto& registry = getAOTIModelRunnerRegistry();
+        std::string device_key = device_str.substr(0, device_str.find(':'));
+        auto it = registry.find(device_key);
+        TORCH_CHECK(
+            it != registry.end(),
+            "Unsupported device for AOTI model runner: ",
+            device_str);
+        return it->second(
+            model_so_path,
+            num_models,
+            device_str,
+            bin_dir,
+            run_single_threaded);
+      },
+      py::arg("model_so_path"),
+      py::arg("num_models"),
+      py::arg("device_str"),
+      py::arg("bin_dir") = "",
+      py::arg("run_single_threaded") = false);
+
   py::class_<AOTIModelContainerRunnerCpu>(m, "AOTIModelContainerRunnerCpu")
       .def(py::init<const std::string&, int>())
       .def(
