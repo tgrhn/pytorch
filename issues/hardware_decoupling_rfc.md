@@ -1,6 +1,6 @@
 ### 🚀 The feature, motivation and pitch
 
-# RFC: Sweep and Refactor Accelerator-Coupled Code Toward a Device-Agnostic System
+# RFC: Sweep and Refactor Device-Coupled Code Toward a Device-Agnostic System
 
 ## Summary
 
