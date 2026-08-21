@@ -68,7 +68,6 @@ This kind of coupling doesn't get cleaned up on its own:
 
 * This does not mean rewriting inherently vendor-locked subsystems (cuDNN bindings, vendor-specific attention kernels, vendor-library-backed ops) to be backend-generic. Those are supposed to reference their vendor directly.
 * This is not a mechanical find-and-replace of every occurrence of a backend's name. A hardcoded check that gates access to something only that backend actually implements is correct and should stay as-is — replacing it with a generic accelerator call would let other backends reach code that was never built to support them, which is worse than the original hardcoding.
-* This does not include an automated lint rule in this pass. That could be a reasonable follow-up once enough real fixes establish a precise, low-noise pattern to detect mechanically.
 
 ## What to look for while sweeping
 
@@ -80,31 +79,13 @@ Concretely, when scanning a file:
 * When replacing a chain with `torch.accelerator.current_accelerator()`, check whether the priority order matches the old chain's (which backend wins if more than one is technically present) — if it differs, call that out explicitly as a behavior change, not a pure refactor.
 * When a fix uses `getattr(torch, device_type)` to reach a sub-attribute (e.g. `<module>.memory.<function>`), verify that attribute actually exists on every backend module being targeted — backend modules aren't guaranteed to have the same shape.
 
-## Where to Start
-
-A few concrete searches to surface candidates:
-
-```bash
-# Hardcoded per-backend if/elif chains (the main pattern this initiative targets)
-grep -rn 'if.*torch\.cuda\.is_available()' --include=*.py torch/
-grep -rn 'if hasattr(torch, "xpu")' --include=*.py torch/
-
-# Comments that flag exactly this kind of manually-maintained list
-grep -rn 'add more.*device\|add more.*backend\|add more.*accelerator' --include=*.py torch/
-
-# Manual per-backend module dispatch that could be getattr(torch, device_type)
-grep -rn 'if device.*==.*"cuda".*:\s*$' --include=*.py torch/ -A 1
-```
-
-These are starting points, not an exhaustive list — treat each hit through the "what to look for" checks above before touching anything, since most will turn out to be correct as-is.
-
 ## Conclusion
 
 This RFC proposes doing the actual refactoring work — finding hardcoded single-backend chains and dispatch logic across the codebase and replacing them with PyTorch's existing generic accelerator primitives, one verified fix at a time — rather than producing a policy document about how such reviews should be conducted in the abstract.
 
 ### Alternatives
 
-_No response_
+**Split into module-specific RFCs (Core, graph mode, distributed, etc.) instead of one generic RFC.** Splitting by module makes the most sense once we actually know how the coupling is distributed across the codebase — that's an open question that only the sweep itself can answer, not something to guess at up front. Starting with a single umbrella RFC avoids duplicating the same guidance across several documents before there's any real data on module boundaries. As the sweep produces findings, splitting into module-specific follow-up RFCs becomes the natural next step for any module whose coupling turns out architecturally complex enough to need its own dedicated design discussion, rather than just mechanical refactors.
 
 ### Additional context
 
